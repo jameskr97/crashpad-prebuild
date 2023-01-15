@@ -1,0 +1,34 @@
+name: Compile Crashpad
+on:
+    workflow_dispatch:
+
+
+jobs:
+    precompile-linux:
+        name: Linux ${{matrix.cfg.target_arch}}
+        runs-on: ubuntu-latest
+        strategy:
+          matrix:
+            cfg:
+              - { target_arch: x64 }
+
+        steps:
+            - name: Install apt packages (x64 only)
+              if: ${{matrix.cfg.target_arch}} == x64
+              run: sudo apt update && sudo apt install -y clang build-essential zlib1g-dev libcurl4-openssl-dev
+
+            - name: Checkout depot_tools and add to path
+              run: |
+                git clone -q --depth 1 https://chromium.googlesource.com/chromium/tools/depot_tools.git
+                echo "$PWD/depot_tools" >> $GITHUB_PATH
+
+            - name: Checkout crashpad
+              run: mkdir -p crashpad && cd crashpad && fetch --no-history --force crashpad
+
+            - name: Generate build files
+              working-directory: crashpad/crashpad
+              run: gn gen out/Default --args='target_cpu="${{matrix.cfg.target_arch}}"'
+
+            - name: Build crashpad
+              working-directory: crashpad/crashpad
+              run: ninja -C out/Default crashpad_handler
